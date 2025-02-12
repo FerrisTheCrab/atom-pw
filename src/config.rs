@@ -21,8 +21,11 @@ static MASTERCONFIG: OnceLock<MasterConfig> = OnceLock::new();
 static ARGON2: OnceLock<Argon2<'static>> = OnceLock::new();
 static ACCOUNTS: OnceLock<Collection<Account>> = OnceLock::new();
 
+#[serde_inline_default]
 #[derive(Serialize, Deserialize, DefaultFromSerde)]
 pub struct MasterConfig {
+    #[serde_inline_default(8080)]
+    pub port: u16,
     #[serde(default)]
     pub mongodb: MongoConfig,
     #[serde(default)]
