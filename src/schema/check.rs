@@ -34,7 +34,7 @@ impl CheckRes {
         Self::Error {
             reason: e
                 .get_custom::<String>()
-                .map(|x| x.to_string())
+                .map(String::clone)
                 .unwrap_or(e.kind.to_string()),
         }
     }

@@ -21,21 +21,15 @@ pub enum RemoveRes {
 }
 
 impl RemoveRes {
-    pub fn success(b: bool) -> Self {
-        if b {
-            Self::Removed
-        } else {
-            Self::Error {
-                reason: "not found".to_string(),
-            }
-        }
+    pub fn success(_: ()) -> Self {
+        Self::Removed
     }
 
     pub fn failure(e: mongodb::error::Error) -> Self {
         Self::Error {
             reason: e
                 .get_custom::<String>()
-                .map(|x| x.to_string())
+                .map(String::clone)
                 .unwrap_or(e.kind.to_string()),
         }
     }

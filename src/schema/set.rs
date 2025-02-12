@@ -29,8 +29,8 @@ impl SetRes {
     pub fn failure(e: mongodb::error::Error) -> Self {
         Self::Error {
             reason: e
-                .get_custom::<Box<dyn std::fmt::Display>>()
-                .map(|x| x.to_string())
+                .get_custom::<String>()
+                .map(String::clone)
                 .unwrap_or(e.kind.to_string()),
         }
     }

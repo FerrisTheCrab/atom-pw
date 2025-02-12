@@ -52,13 +52,19 @@ impl Account {
     }
 
     async fn update(&self) -> Result<(), mongodb::error::Error> {
-        MongoConfig::get()
+        if MongoConfig::get()
             .update_one(
                 doc! { "_id": Bson::Int64(self.id as i64)},
                 doc! { "$set": {"pwHash": &self.pw_hash}},
             )
-            .await?;
-        Ok(())
+            .await?
+            .matched_count
+            == 0
+        {
+            Err(not_found!())
+        } else {
+            Ok(())
+        }
     }
 
     #[allow(clippy::wrong_self_convention, clippy::new_ret_no_self)]
@@ -131,9 +137,14 @@ impl Account {
         account.update().await
     }
 
-    pub async fn remove(id: u64) -> Result<bool, mongodb::error::Error> {
+    pub async fn remove(id: u64) -> Result<(), mongodb::error::Error> {
         cond_not_found!(id);
-        Self::delete(id).await
+
+        if Self::delete(id).await? {
+            Ok(())
+        } else {
+            Err(not_found!())
+        }
     }
 
     pub async fn check(id: u64, pw: String) -> Result<bool, mongodb::error::Error> {
