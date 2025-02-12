@@ -72,7 +72,7 @@ Creates a new password entry.
 ```jsonc
 {
   "type": "created",
-  "id": 123         // id of entry created
+  "id": "UInt"         // id of entry created
 }
 ```
 
@@ -84,7 +84,7 @@ Check if a given password is correct.
 
 ```jsonc
 {
-  "id": 123,        // id of entry to verify for
+  "id": "UInt",        // id of entry to verify for
   "pw": "String"
 }
 ```
@@ -93,13 +93,8 @@ Check if a given password is correct.
 
 ```jsonc
 {
-  "type": "match"
-}
-```
-or
-```jsonc
-{
-  "type": "mismatch"
+  "type": "checked",
+  "match": "Bool"
 }
 ```
 
@@ -111,7 +106,7 @@ Change value of an existing entry
 
 ```jsonc
 {
-  "id": 123,
+  "id": "UInt",
   "pw": "String"    // the new password
 }
 ```
@@ -132,7 +127,7 @@ Remove an existing entry
 
 ```jsonc
 {
-  "id": 123,
+  "id": "UInt",
 }
 ```
 

@@ -15,10 +15,8 @@ pub struct CheckReq {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum CheckRes {
-    #[serde(rename = "match")]
-    Match,
-    #[serde(rename = "mismatch")]
-    Mismatch,
+    #[serde(rename = "checked")]
+    Checked { matches: bool },
     #[serde(rename = "error")]
     Error { reason: String },
 }
@@ -26,9 +24,9 @@ pub enum CheckRes {
 impl CheckRes {
     pub fn success(b: bool) -> Self {
         if b {
-            Self::Match
+            Self::Checked { matches: true }
         } else {
-            Self::Mismatch
+            Self::Checked { matches: false }
         }
     }
 
@@ -43,8 +41,7 @@ impl CheckRes {
 
     pub fn status(&self) -> StatusCode {
         match self {
-            CheckRes::Match => StatusCode::OK,
-            CheckRes::Mismatch => StatusCode::UNAUTHORIZED,
+            CheckRes::Checked { .. } => StatusCode::OK,
             CheckRes::Error { .. } => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
