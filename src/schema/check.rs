@@ -49,7 +49,7 @@ impl CheckRes {
 
 impl InternalRouter {
     pub async fn check(payload: CheckReq) -> CheckRes {
-        Account::check(payload.id, &payload.pw)
+        Account::check(payload.id, payload.pw)
             .await
             .map(CheckRes::success)
             .unwrap_or_else(CheckRes::failure)

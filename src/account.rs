@@ -105,9 +105,11 @@ impl Account {
 
 impl Account {
     #[allow(clippy::new_ret_no_self)]
-    pub async fn create(pw: &str) -> Result<u64, mongodb::error::Error> {
+    pub async fn create(pw: String) -> Result<u64, mongodb::error::Error> {
         let counter = Self::get_bump_counter().await?;
-        let hash = Self::hash(pw, counter);
+        let hash = tokio::task::spawn_blocking(move || Self::hash(&pw, counter))
+            .await
+            .unwrap();
         let account = Account {
             id: counter,
             pw_hash: Binary {
@@ -134,9 +136,12 @@ impl Account {
         Self::delete(id).await
     }
 
-    pub async fn check(id: u64, pw: &str) -> Result<bool, mongodb::error::Error> {
+    pub async fn check(id: u64, pw: String) -> Result<bool, mongodb::error::Error> {
         cond_not_found!(id);
         let account = Self::get_with_id(id).await?.ok_or(not_found!())?;
-        Ok(account.verify_pw(pw))
+        let res = tokio::task::spawn_blocking(move || account.verify_pw(&pw))
+            .await
+            .unwrap();
+        Ok(res)
     }
 }

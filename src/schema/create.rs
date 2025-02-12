@@ -44,7 +44,7 @@ impl CreateRes {
 
 impl InternalRouter {
     pub async fn create(payload: CreateReq) -> CreateRes {
-        Account::create(&payload.pw)
+        Account::create(payload.pw)
             .await
             .map(CreateRes::success)
             .unwrap_or_else(CreateRes::failure)
