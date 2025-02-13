@@ -1,7 +1,10 @@
-use axum::{http::StatusCode, Json};
+use std::sync::Arc;
+
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    instance::PwInstance,
     router::{InternalRouter, Router},
     Account,
 };
@@ -30,7 +33,7 @@ impl SetRes {
         Self::Error {
             reason: e
                 .get_custom::<String>()
-                .map(String::clone)
+                .cloned()
                 .unwrap_or(e.kind.to_string()),
         }
     }
@@ -44,8 +47,8 @@ impl SetRes {
 }
 
 impl InternalRouter {
-    pub async fn set(payload: SetReq) -> SetRes {
-        Account::set(payload.id, &payload.pw)
+    pub async fn set(instance: &PwInstance, payload: SetReq) -> SetRes {
+        Account::set(instance, payload.id, &payload.pw)
             .await
             .map(SetRes::success)
             .unwrap_or_else(SetRes::failure)
@@ -53,8 +56,11 @@ impl InternalRouter {
 }
 
 impl Router {
-    pub async fn set(Json(payload): Json<SetReq>) -> (StatusCode, Json<SetRes>) {
-        let res = InternalRouter::set(payload).await;
+    pub async fn set(
+        State(instance): State<Arc<PwInstance>>,
+        Json(payload): Json<SetReq>,
+    ) -> (StatusCode, Json<SetRes>) {
+        let res = InternalRouter::set(&instance, payload).await;
         (res.status(), Json(res))
     }
 }

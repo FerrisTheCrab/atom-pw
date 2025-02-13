@@ -1,9 +1,7 @@
 use std::{
-    env,
     fs::{self, OpenOptions},
     io::Write,
-    path::{Path, PathBuf},
-    sync::OnceLock,
+    path::Path,
 };
 
 use argon2::{Algorithm, Argon2, Params};
@@ -17,12 +15,8 @@ use serde_inline_default::serde_inline_default;
 
 use crate::Account;
 
-static MASTERCONFIG: OnceLock<MasterConfig> = OnceLock::new();
-static ARGON2: OnceLock<Argon2<'static>> = OnceLock::new();
-static ACCOUNTS: OnceLock<Collection<Account>> = OnceLock::new();
-
 #[serde_inline_default]
-#[derive(Serialize, Deserialize, DefaultFromSerde)]
+#[derive(Serialize, Deserialize, DefaultFromSerde, Clone)]
 pub struct MasterConfig {
     #[serde_inline_default(8080)]
     pub port: u16,
@@ -33,7 +27,7 @@ pub struct MasterConfig {
 }
 
 #[serde_inline_default]
-#[derive(Serialize, Deserialize, DefaultFromSerde)]
+#[derive(Serialize, Deserialize, DefaultFromSerde, Clone)]
 pub struct MongoConfig {
     #[serde_inline_default("mongodb://localhost:27017".to_string())]
     pub address: String,
@@ -50,7 +44,7 @@ pub struct MongoConfig {
 }
 
 #[serde_inline_default]
-#[derive(Serialize, Deserialize, DefaultFromSerde)]
+#[derive(Serialize, Deserialize, DefaultFromSerde, Clone)]
 pub struct Argon2Config {
     #[serde_inline_default("change me".to_string())]
     pub pepper: String,
@@ -90,29 +84,19 @@ impl MasterConfig {
             .unwrap();
     }
 
-    fn read() -> Self {
-        let path = PathBuf::from(env::var("CONFIG").expect("env CONFIG not set"));
-
+    pub fn read(path: &Path) -> Self {
         if !path.exists() {
-            Self::create(&path);
+            Self::create(path);
         }
 
         let content = fs::read(path).unwrap();
         serde_json::from_slice(&content).expect("bad JSON")
     }
-
-    pub fn get() -> &'static Self {
-        MASTERCONFIG.get_or_init(Self::read)
-    }
 }
 
 impl MongoConfig {
-    pub fn get() -> &'static Collection<Account> {
-        ACCOUNTS.get_or_init(Self::load)
-    }
-
-    fn load() -> Collection<Account> {
-        futures::executor::block_on(async { MasterConfig::get().mongodb.get_collection().await })
+    pub fn load(&self) -> Collection<Account> {
+        futures::executor::block_on(async { self.get_collection().await })
     }
 
     async fn get_collection(&self) -> Collection<Account> {
@@ -132,15 +116,7 @@ impl MongoConfig {
 }
 
 impl Argon2Config {
-    pub fn get() -> &'static Argon2<'static> {
-        ARGON2.get_or_init(Self::load)
-    }
-
-    fn load() -> Argon2<'static> {
-        MASTERCONFIG.get().unwrap().argon2.to_argon2()
-    }
-
-    fn to_argon2(&'static self) -> Argon2<'static> {
+    pub fn to_argon2(&self) -> Argon2<'_> {
         let algorithm = match self.algorithm.as_str() {
             "Argon2d" => Algorithm::Argon2d,
             "Argon2i" => Algorithm::Argon2i,

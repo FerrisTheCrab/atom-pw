@@ -3,7 +3,7 @@ use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
 use mongodb::bson::{doc, spec::BinarySubtype, Binary, Bson};
 use serde::{Deserialize, Serialize};
 
-use crate::config::{Argon2Config, MongoConfig};
+use crate::instance::PwInstance;
 
 macro_rules! not_found {
     () => {
@@ -28,31 +28,37 @@ pub struct Account {
 }
 
 impl Account {
-    fn hash(pw: &str, id: u64) -> Vec<u8> {
+    fn hash(instance: &PwInstance, pw: &str, id: u64) -> Vec<u8> {
         let b64 = BASE64_STANDARD_NO_PAD.encode(id.to_le_bytes());
 
         let salt = SaltString::from_b64(&b64).unwrap();
-        let hashed = Argon2Config::get()
+        let hashed = instance
+            .argon2()
             .hash_password(pw.as_bytes(), &salt)
             .unwrap();
 
         hashed.hash.unwrap().as_bytes().to_vec()
     }
 
-    fn verify_pw(&self, pw: &str) -> bool {
-        Self::hash(pw, self.id) == self.pw_hash.bytes
+    fn verify_pw(&self, instance: &PwInstance, pw: &str) -> bool {
+        Self::hash(instance, pw, self.id) == self.pw_hash.bytes
     }
 }
 
 impl Account {
-    async fn get_with_id(id: u64) -> Result<Option<Account>, mongodb::error::Error> {
-        MongoConfig::get()
+    async fn get_with_id(
+        instance: &PwInstance,
+        id: u64,
+    ) -> Result<Option<Account>, mongodb::error::Error> {
+        instance
+            .accounts
             .find_one(doc! { "_id": Bson::Int64(id as i64) })
             .await
     }
 
-    async fn update(&self) -> Result<(), mongodb::error::Error> {
-        if MongoConfig::get()
+    async fn update(&self, instance: &PwInstance) -> Result<(), mongodb::error::Error> {
+        if instance
+            .accounts
             .update_one(
                 doc! { "_id": Bson::Int64(self.id as i64)},
                 doc! { "$set": {"pwHash": &self.pw_hash}},
@@ -68,21 +74,22 @@ impl Account {
     }
 
     #[allow(clippy::wrong_self_convention, clippy::new_ret_no_self)]
-    async fn new(&self) -> Result<(), mongodb::error::Error> {
-        MongoConfig::get().insert_one(self).await?;
+    async fn new(&self, instance: &PwInstance) -> Result<(), mongodb::error::Error> {
+        instance.accounts.insert_one(self).await?;
         Ok(())
     }
 
-    async fn delete(id: u64) -> Result<bool, mongodb::error::Error> {
-        Ok(MongoConfig::get()
+    async fn delete(instance: &PwInstance, id: u64) -> Result<bool, mongodb::error::Error> {
+        Ok(instance
+            .accounts
             .delete_one(doc! { "_id": Bson::Int64(id as i64) })
             .await?
             .deleted_count
             == 1)
     }
 
-    async fn get_bump_counter() -> Result<u64, mongodb::error::Error> {
-        match Self::get_with_id(0).await? {
+    async fn get_bump_counter(instance: &PwInstance) -> Result<u64, mongodb::error::Error> {
+        match Self::get_with_id(instance, 0).await? {
             Some(mut res) => {
                 let count =
                     u64::from_le_bytes(res.pw_hash.bytes.as_slice().try_into().unwrap()) + 1;
@@ -90,7 +97,7 @@ impl Account {
                     subtype: BinarySubtype::Generic,
                     bytes: count.to_le_bytes().to_vec(),
                 };
-                res.update().await?;
+                res.update(instance).await?;
                 Ok(count)
             }
             None => {
@@ -102,7 +109,7 @@ impl Account {
                         bytes,
                     },
                 };
-                counter.new().await?;
+                counter.new(instance).await?;
                 Ok(1)
             }
         }
@@ -111,9 +118,11 @@ impl Account {
 
 impl Account {
     #[allow(clippy::new_ret_no_self)]
-    pub async fn create(pw: String) -> Result<u64, mongodb::error::Error> {
-        let counter = Self::get_bump_counter().await?;
-        let hash = tokio::task::spawn_blocking(move || Self::hash(&pw, counter))
+    pub async fn create(instance: &PwInstance, pw: String) -> Result<u64, mongodb::error::Error> {
+        let counter = Self::get_bump_counter(instance).await?;
+
+        let instance_clone = instance.clone();
+        let hash = tokio::task::spawn_blocking(move || Self::hash(&instance_clone, &pw, counter))
             .await
             .unwrap();
         let account = Account {
@@ -123,34 +132,43 @@ impl Account {
                 bytes: hash,
             },
         };
-        account.new().await?;
+        account.new(instance).await?;
         Ok(counter)
     }
 
-    pub async fn set(id: u64, pw: &str) -> Result<(), mongodb::error::Error> {
+    pub async fn set(
+        instance: &PwInstance,
+        id: u64,
+        pw: &str,
+    ) -> Result<(), mongodb::error::Error> {
         cond_not_found!(id);
-        let mut account = Self::get_with_id(id).await?.ok_or(not_found!())?;
+        let mut account = Self::get_with_id(instance, id).await?.ok_or(not_found!())?;
         account.pw_hash = Binary {
             subtype: BinarySubtype::Generic,
-            bytes: Self::hash(pw, id),
+            bytes: Self::hash(instance, pw, id),
         };
-        account.update().await
+        account.update(instance).await
     }
 
-    pub async fn remove(id: u64) -> Result<(), mongodb::error::Error> {
+    pub async fn remove(instance: &PwInstance, id: u64) -> Result<(), mongodb::error::Error> {
         cond_not_found!(id);
 
-        if Self::delete(id).await? {
+        if Self::delete(instance, id).await? {
             Ok(())
         } else {
             Err(not_found!())
         }
     }
 
-    pub async fn check(id: u64, pw: String) -> Result<bool, mongodb::error::Error> {
+    pub async fn check(
+        instance: &PwInstance,
+        id: u64,
+        pw: String,
+    ) -> Result<bool, mongodb::error::Error> {
         cond_not_found!(id);
-        let account = Self::get_with_id(id).await?.ok_or(not_found!())?;
-        let res = tokio::task::spawn_blocking(move || account.verify_pw(&pw))
+        let account = Self::get_with_id(instance, id).await?.ok_or(not_found!())?;
+        let instance_clone = instance.clone();
+        let res = tokio::task::spawn_blocking(move || account.verify_pw(&instance_clone, &pw))
             .await
             .unwrap();
         Ok(res)

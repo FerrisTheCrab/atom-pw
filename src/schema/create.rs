@@ -1,7 +1,10 @@
-use axum::{http::StatusCode, Json};
+use std::sync::Arc;
+
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    instance::PwInstance,
     router::{InternalRouter, Router},
     Account,
 };
@@ -29,7 +32,7 @@ impl CreateRes {
         Self::Error {
             reason: e
                 .get_custom::<String>()
-                .map(String::clone)
+                .cloned()
                 .unwrap_or(e.kind.to_string()),
         }
     }
@@ -43,8 +46,8 @@ impl CreateRes {
 }
 
 impl InternalRouter {
-    pub async fn create(payload: CreateReq) -> CreateRes {
-        Account::create(payload.pw)
+    pub async fn create(instance: &PwInstance, payload: CreateReq) -> CreateRes {
+        Account::create(instance, payload.pw)
             .await
             .map(CreateRes::success)
             .unwrap_or_else(CreateRes::failure)
@@ -52,8 +55,11 @@ impl InternalRouter {
 }
 
 impl Router {
-    pub async fn create(Json(payload): Json<CreateReq>) -> (StatusCode, Json<CreateRes>) {
-        let res = InternalRouter::create(payload).await;
+    pub async fn create(
+        State(instance): State<Arc<PwInstance>>,
+        Json(payload): Json<CreateReq>,
+    ) -> (StatusCode, Json<CreateRes>) {
+        let res = InternalRouter::create(&instance, payload).await;
         (res.status(), Json(res))
     }
 }

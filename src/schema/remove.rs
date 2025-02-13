@@ -1,7 +1,10 @@
-use axum::{http::StatusCode, Json};
+use std::sync::Arc;
+
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    instance::PwInstance,
     router::{InternalRouter, Router},
     Account,
 };
@@ -29,7 +32,7 @@ impl RemoveRes {
         Self::Error {
             reason: e
                 .get_custom::<String>()
-                .map(String::clone)
+                .cloned()
                 .unwrap_or(e.kind.to_string()),
         }
     }
@@ -44,8 +47,8 @@ impl RemoveRes {
 }
 
 impl InternalRouter {
-    pub async fn remove(payload: RemoveReq) -> RemoveRes {
-        Account::remove(payload.id)
+    pub async fn remove(instance: &PwInstance, payload: RemoveReq) -> RemoveRes {
+        Account::remove(instance, payload.id)
             .await
             .map(RemoveRes::success)
             .unwrap_or_else(RemoveRes::failure)
@@ -53,8 +56,11 @@ impl InternalRouter {
 }
 
 impl Router {
-    pub async fn remove(Json(payload): Json<RemoveReq>) -> (StatusCode, Json<RemoveRes>) {
-        let res = InternalRouter::remove(payload).await;
+    pub async fn remove(
+        State(instance): State<Arc<PwInstance>>,
+        Json(payload): Json<RemoveReq>,
+    ) -> (StatusCode, Json<RemoveRes>) {
+        let res = InternalRouter::remove(&instance, payload).await;
         (res.status(), Json(res))
     }
 }
