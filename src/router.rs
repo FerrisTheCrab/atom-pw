@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::routing::post;
 
 use crate::instance::PwInstance;
@@ -14,6 +12,6 @@ impl Router {
             .route("/set", post(Router::set))
             .route("/remove", post(Router::remove))
             .route("/check", post(Router::check))
-            .with_state(Arc::new(instance))
+            .with_state(instance)
     }
 }

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
@@ -61,7 +59,7 @@ impl InternalRouter {
 
 impl Router {
     pub async fn check(
-        State(instance): State<Arc<PwInstance>>,
+        State(instance): State<PwInstance>,
         Json(payload): Json<CheckReq>,
     ) -> (StatusCode, Json<CheckRes>) {
         let res = InternalRouter::check(&instance, payload).await;
