@@ -39,8 +39,8 @@ pub struct MongoConfig {
     #[serde(rename = "authDB")]
     pub auth_db: String,
     #[serde_inline_default("atomics".to_string())]
-    #[serde(rename = "pwDB")]
-    pub pw_db: String,
+    #[serde(rename = "masterDB")]
+    pub master_db: String,
 }
 
 #[serde_inline_default]
@@ -111,7 +111,7 @@ impl MongoConfig {
 
         client_opts.credential = Some(scram_sha_1_cred);
         let client = Client::with_options(client_opts).unwrap();
-        client.database(&self.pw_db).collection("pw")
+        client.database(&self.master_db).collection("pw")
     }
 }
 
