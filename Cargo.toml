@@ -28,4 +28,4 @@ features = [
 
 [features]
 default = [ ]
-core = [ "dep:mongodb", "dep:futures", "dep:axum" ]
+core = [ "dep:mongodb", "dep:futures", "dep:axum", "dep:argon2", "dep:base64" ]

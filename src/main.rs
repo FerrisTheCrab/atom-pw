@@ -18,6 +18,7 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
+#[cfg(not(feature = "core"))]
 fn main() {
     println!("Core is disabled")
 }
