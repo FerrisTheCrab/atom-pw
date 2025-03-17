@@ -1,7 +1,10 @@
+#[cfg(feature = "core")]
 use std::path::PathBuf;
 
+#[cfg(feature = "core")]
 use atom_pw::{PwInstance, Router};
 
+#[cfg(feature = "core")]
 #[tokio::main]
 async fn main() {
     let path = PathBuf::from(std::env::var("CONFIG").expect("env CONFIG not set"));
@@ -13,4 +16,8 @@ async fn main() {
         .await
         .unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+fn main() {
+    println!("Core is disabled")
 }

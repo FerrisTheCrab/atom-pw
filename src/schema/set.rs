@@ -1,6 +1,8 @@
+#[cfg(feature = "core")]
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "core")]
 use crate::{
     instance::PwInstance,
     router::{InternalRouter, Router},
@@ -22,6 +24,7 @@ pub enum SetRes {
     Error { reason: String },
 }
 
+#[cfg(feature = "core")]
 impl SetRes {
     pub fn success(_: ()) -> Self {
         Self::Set
@@ -44,6 +47,7 @@ impl SetRes {
     }
 }
 
+#[cfg(feature = "core")]
 impl InternalRouter {
     pub async fn set(instance: &PwInstance, payload: SetReq) -> SetRes {
         Account::set(instance, payload.id, &payload.pw)
@@ -53,6 +57,7 @@ impl InternalRouter {
     }
 }
 
+#[cfg(feature = "core")]
 impl Router {
     pub async fn set(
         State(instance): State<PwInstance>,
